@@ -10,15 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 1. Definir las páginas secundarias de forma segura
-# (Asegúrate de que tus archivos en la carpeta 'pages/' se llamen exactamente así y sin tildes)
-energia_page = st.Page("pages/energia.py", title="Energía", icon="⚡")
-inventario_page = st.Page("pages/inventario.py", title="Inventario", icon="📷")
-temperatura_page = st.Page("pages/temperatura.py", title="Temperatura", icon="🌡️")
-
-# Registrar la navegación global (esto evita que Streamlit colapse)
-nav = st.navigation([energia_page, inventario_page, temperatura_page], position="hidden")
-
 # ─────────────────────────────────────────────
 # ESTILOS CSS: ESTÉTICA DIVERTIDA Y MODERNA
 # ─────────────────────────────────────────────
@@ -67,32 +58,26 @@ st.markdown("""
         font-size: 1.1rem !important;
     }
 
-    /* Estilo para los botones de enlace de página */
-    [data-testid="stPageLink"] {
+    /* Estilo de los botones principales */
+    .stButton button {
         background: #ffffff !important;
         border: 3px solid #0284c7 !important;
         border-radius: 16px !important;
-        padding: 15px !important;
+        color: #0369a1 !important;
+        font-family: 'Fredoka', cursive !important;
+        font-size: 1.3rem !important;
+        padding: 30px 10px !important;
         box-shadow: 0 6px 15px rgba(0,0,0,0.08);
         transition: all 0.3s ease;
-        text-align: center;
+        width: 100%;
     }
 
-    [data-testid="stPageLink"]:hover {
+    .stButton button:hover {
         background: #0284c7 !important;
+        color: #ffffff !important;
         transform: translateY(-5px);
         box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
         border-color: #0369a1 !important;
-    }
-    
-    [data-testid="stPageLink"] span {
-        font-family: 'Fredoka', cursive !important;
-        font-size: 1.2rem !important;
-        color: #0369a1 !important;
-    }
-
-    [data-testid="stPageLink"]:hover span {
-        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -114,10 +99,13 @@ st.markdown("<p style='text-align: center; margin-bottom: 30px;'>Selecciona una 
 col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
-    st.page_link(energia_page, label="⚡ Energía", use_container_width=True)
+    if st.button("⚡\n\n Energía", use_container_width=True):
+        st.switch_page("pages/energia.py")
 
 with col2:
-    st.page_link(inventario_page, label="📷 Inventario", use_container_width=True)
+    if st.button("📷\n\n Inventario", use_container_width=True):
+        st.switch_page("pages/inventario.py")
 
 with col3:
-    st.page_link(temperatura_page, label="🌡️ Temperatura", use_container_width=True)
+    if st.button("🌡️\n\n Temperatura", use_container_width=True):
+        st.switch_page("pages/temperatura.py")
