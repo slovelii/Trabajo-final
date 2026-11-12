@@ -10,6 +10,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Definir las páginas usando st.Page (evita el error de StreamlitPageNotFoundError)
+energia_page = st.Page("pages/energia.py", title="Energía", icon="⚡")
+inventario_page = st.Page("pages/inventario.py", title="Inventario", icon="📷")
+temperatura_page = st.Page("pages/temperatura.py", title="Temperatura", icon="🌡️")
+
 # ─────────────────────────────────────────────
 # ESTILOS CSS: ESTÉTICA DIVERTIDA Y MODERNA
 # ─────────────────────────────────────────────
@@ -58,7 +63,7 @@ st.markdown("""
         font-size: 1.1rem !important;
     }
 
-    /* Estilo para los contenedores de enlaces de página */
+    /* Estilo para los botones de enlace de página */
     [data-testid="stPageLink"] {
         background: #ffffff !important;
         border: 3px solid #0284c7 !important;
@@ -105,10 +110,10 @@ st.markdown("<p style='text-align: center; margin-bottom: 30px;'>Selecciona una 
 col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
-    st.page_link("pages/Energía.py", label="⚡ Energía", use_container_width=True)
+    st.page_link(energia_page, label="⚡ Energía", use_container_width=True)
 
 with col2:
-    st.page_link("pages/Inventario.py", label="📷 Inventario", use_container_width=True)
+    st.page_link(inventario_page, label="📷 Inventario", use_container_width=True)
 
 with col3:
-    st.page_link("pages/Temperatura.py", label="🌡️ Temperatura", use_container_width=True)
+    st.page_link(temperatura_page, label="🌡️ Temperatura", use_container_width=True)
