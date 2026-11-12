@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+import unicodedata
 
 # Configuración inicial de la página
 st.set_page_config(
@@ -8,16 +9,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Controlador de navegación en memoria (evita StreamlitPageNotFoundError)
 if "pagina_activa" not in st.session_state:
     st.session_state.pagina_activa = "inicio"
 
 def ir_a(nombre_pagina):
     st.session_state.pagina_activa = nombre_pagina
 
-# Si el usuario seleccionó uno de los 3 módulos, cargamos ese archivo directamente
+def normalizar(texto):
+    """Elimina tildes, espacios invisibles y pasa a minúsculas."""
+    texto_sin_tildes = ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return texto_sin_tildes.strip().lower()
+
+def encontrar_archivo_real(nombre_buscado):
+    """Busca el archivo .py en todo el repositorio sin importar espacios en carpetas."""
+    raiz = Path(__file__).resolve().parent
+    objetivo = normalizar(nombre_buscado)
+    for ruta in raiz.rglob("*.py"):
+        if ruta.name != Path(__file__).name:
+            if objetivo in normalizar(ruta.stem):
+                return ruta
+    return None
+
+# Si el usuario entró a alguno de los 3 módulos:
 if st.session_state.pagina_activa != "inicio":
-    # Ocultar barra lateral también en las subpáginas
     st.markdown("""
         <style>
         #MainMenu, footer, header {visibility: hidden;}
@@ -25,26 +42,35 @@ if st.session_state.pagina_activa != "inicio":
         </style>
     """, unsafe_allow_html=True)
 
-    # Botón universal para regresar a la puerta de la nevera
     if st.button("← Volver al Panel Principal"):
         st.session_state.pagina_activa = "inicio"
         st.rerun()
 
-    # Ruta exacta hacia el archivo dentro de la carpeta pages/
-    ruta_archivo = Path(__file__).parent / "pages" / f"{st.session_state.pagina_activa}.py"
+    ruta_archivo = encontrar_archivo_real(st.session_state.pagina_activa)
 
-    if ruta_archivo.exists():
+    if ruta_archivo and ruta_archivo.exists():
         codigo = ruta_archivo.read_text(encoding="utf-8")
-        # Ignoramos set_page_config o switch_page viejos dentro del archivo secundario para que no choquen
+        
+        # Filtramos st.set_page_config y el botón viejo de switch_page para que no den error
         lineas_limpias = []
         for linea in codigo.splitlines():
-            if "st.switch_page" in linea:
-                lineas_limpias.append(linea.replace("st.switch_page", "# st.switch_page"))
-            else:
-                lineas_limpias.append(linea)
-        exec("\n".join(lineas_limpias), globals())
+            if "st.switch_page" in linea or "Volver al Panel Principal" in linea:
+                continue
+            lineas_limpias.append(linea)
+        
+        codigo_final = "\n".join(lineas_limpias).strip()
+        
+        # Si el archivo en GitHub solo tenía el botón de volver y nada más, mostramos aviso
+        if codigo_final == "" or codigo_final == "import streamlit as st":
+            st.info(f"Conectado exitosamente a `{ruta_archivo.name}`. Agrega aquí tus gráficas y controles de {st.session_state.pagina_activa}.")
+        else:
+            exec(codigo_final, globals())
     else:
-        st.error(f"No se encontró el archivo: {ruta_archivo}")
+        # Diagnóstico en pantalla: muestra todos los archivos que realmente existen en el servidor
+        raiz = Path(__file__).resolve().parent
+        archivos_en_servidor = [str(p.relative_to(raiz)) for p in raiz.rglob("*")]
+        st.error(f"No se encontró '{st.session_state.pagina_activa}.py'.")
+        st.write("Archivos detectados actualmente en tu servidor de Streamlit:", archivos_en_servidor)
 
     st.stop()
 
