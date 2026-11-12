@@ -58,26 +58,32 @@ st.markdown("""
         font-size: 1.1rem !important;
     }
 
-    /* Estilo de los botones principales */
-    .stButton button {
+    /* Estilo para los contenedores de enlaces de página */
+    [data-testid="stPageLink"] {
         background: #ffffff !important;
         border: 3px solid #0284c7 !important;
         border-radius: 16px !important;
-        color: #0369a1 !important;
-        font-family: 'Fredoka', cursive !important;
-        font-size: 1.3rem !important;
-        padding: 30px 10px !important;
+        padding: 15px !important;
         box-shadow: 0 6px 15px rgba(0,0,0,0.08);
         transition: all 0.3s ease;
-        width: 100%;
+        text-align: center;
     }
 
-    .stButton button:hover {
+    [data-testid="stPageLink"]:hover {
         background: #0284c7 !important;
-        color: #ffffff !important;
         transform: translateY(-5px);
         box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
         border-color: #0369a1 !important;
+    }
+    
+    [data-testid="stPageLink"] span {
+        font-family: 'Fredoka', cursive !important;
+        font-size: 1.2rem !important;
+        color: #0369a1 !important;
+    }
+
+    [data-testid="stPageLink"]:hover span {
+        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -94,18 +100,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h3 style='text-align: center; color: #0369a1; font-family: Fredoka;'>🎛️ Panel de Control de la Nevera</h3>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; margin-bottom: 30px;'>Selecciona una sección o usa la barra lateral izquierda para navegar:</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; margin-bottom: 30px;'>Selecciona una sección para navegar directamente:</p>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
-    if st.button("⚡\n\n Energía", use_container_width=True):
-        st.switch_page("pages/Energía.py")[cite: 1]
+    st.page_link("pages/Energía.py", label="⚡ Energía", use_container_width=True)
 
 with col2:
-    if st.button("📷\n\n Inventario", use_container_width=True):
-        st.switch_page("pages/Inventario.py")[cite: 1]
+    st.page_link("pages/Inventario.py", label="📷 Inventario", use_container_width=True)
 
 with col3:
-    if st.button("🌡️\n\n Temperatura", use_container_width=True):
-        st.switch_page("pages/Temperatura.py")[cite: 1]
+    st.page_link("pages/Temperatura.py", label="🌡️ Temperatura", use_container_width=True)
