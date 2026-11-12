@@ -1,30 +1,11 @@
 import streamlit as st
-from pathlib import Path
 
-# 1. Configuración de página (una sola vez en toda la app)
 st.set_page_config(
     page_title="Panel de Control - Nevera Inteligente",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# 2. Localizador automático de tus archivos en /pages (resuelve rutas relativas reales)
-BASE_DIR = Path(__file__).resolve().parent
-PAGES_DIR = BASE_DIR / "pages"
-
-def buscar_pagina(palabra_clave):
-    """Busca el archivo real en /pages que contenga la palabra clave (ej. 'temperatura')."""
-    if PAGES_DIR.exists():
-        for archivo in PAGES_DIR.glob("*.py"):
-            if palabra_clave.lower() in archivo.stem.lower():
-                return str(archivo)
-    return None
-
-ruta_temp = buscar_pagina("temperatura")
-ruta_inv = buscar_pagina("inventario")
-ruta_ener = buscar_pagina("energia")
-
-# 3. Vista de la puerta principal de la nevera
 def vista_inicio():
     st.markdown("""
         <style>
@@ -161,41 +142,23 @@ def vista_inicio():
     st.markdown('<div class="door-seal"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Módulos de Monitoreo</div>', unsafe_allow_html=True)
 
-    # Botones que usan los objetos st.Page registrados abajo
     if st.button("CONTROL DE TEMPERATURA", use_container_width=True):
-        if pag_temperatura:
-            st.switch_page(pag_temperatura)
-        else:
-            st.error(f"No se encontró el archivo de temperatura en: {PAGES_DIR}")
+        st.switch_page(pag_temperatura)
 
     if st.button("GESTIÓN DE INVENTARIO", use_container_width=True):
-        if pag_inventario:
-            st.switch_page(pag_inventario)
-        else:
-            st.error(f"No se encontró el archivo de inventario en: {PAGES_DIR}")
+        st.switch_page(pag_inventario)
 
     if st.button("CONSUMO DE ENERGÍA", use_container_width=True):
-        if pag_energia:
-            st.switch_page(pag_energia)
-        else:
-            st.error(f"No se encontró el archivo de energía en: {PAGES_DIR}")
+        st.switch_page(pag_energia)
 
-# 4. Registro dinámico de páginas en st.navigation
+# Registro directo con rutas relativas exactas según tu GitHub
 pag_inicio = st.Page(vista_inicio, title="Panel Principal", default=True)
-paginas_registradas = [pag_inicio]
+pag_temperatura = st.Page("pages/temperatura.py", title="Temperatura")
+pag_inventario = st.Page("pages/inventario.py", title="Inventario")
+pag_energia = st.Page("pages/energia.py", title="Energía")
 
-pag_temperatura = st.Page(ruta_temp, title="Temperatura") if ruta_temp else None
-if pag_temperatura:
-    paginas_registradas.append(pag_temperatura)
+# Guardamos pag_inicio en session_state para que las otras páginas vuelvan sin errores
+st.session_state["pag_inicio"] = pag_inicio
 
-pag_inventario = st.Page(ruta_inv, title="Inventario") if ruta_inv else None
-if pag_inventario:
-    paginas_registradas.append(pag_inventario)
-
-pag_energia = st.Page(ruta_ener, title="Energía") if ruta_ener else None
-if pag_energia:
-    paginas_registradas.append(pag_energia)
-
-# 5. Ejecutar navegación ocultando el menú lateral nativo
-pg = st.navigation(paginas_registradas, position="hidden")
+pg = st.navigation([pag_inicio, pag_temperatura, pag_inventario, pag_energia], position="hidden")
 pg.run()
