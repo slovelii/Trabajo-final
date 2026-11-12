@@ -10,10 +10,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Definir las páginas usando st.Page (evita el error de StreamlitPageNotFoundError)
+# 1. Definir las páginas secundarias de forma segura
+# (Asegúrate de que tus archivos en la carpeta 'pages/' se llamen exactamente así y sin tildes)
 energia_page = st.Page("pages/energia.py", title="Energía", icon="⚡")
 inventario_page = st.Page("pages/inventario.py", title="Inventario", icon="📷")
 temperatura_page = st.Page("pages/temperatura.py", title="Temperatura", icon="🌡️")
+
+# Registrar la navegación global (esto evita que Streamlit colapse)
+nav = st.navigation([energia_page, inventario_page, temperatura_page], position="hidden")
 
 # ─────────────────────────────────────────────
 # ESTILOS CSS: ESTÉTICA DIVERTIDA Y MODERNA
