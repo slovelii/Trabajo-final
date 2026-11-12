@@ -1,118 +1,188 @@
 import streamlit as st
 
+# Configuración inicial de la página
 st.set_page_config(
-    page_title="SmartFridge IoT 🧊 — Centro de Control",
-    page_icon="🧊",
+    page_title="Panel de Control - Nevera Inteligente",
     layout="centered",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# 1. Definir todas las páginas (incluyendo el inicio)
-home_page = st.Page("Inicio.py", title="Inicio", icon="🏠", default=True)
-energia_page = st.Page("pages/energia.py", title="Energía", icon="⚡")
-inventario_page = st.Page("pages/inventario.py", title="Inventario", icon="📷")
-temperatura_page = st.Page("pages/temperatura.py", title="Temperatura", icon="🌡️")
-
-# 2. Registrar la navegación global (ocultando la barra lateral para mantener tu diseño limpio)
-pg = st.navigation([home_page, energia_page, inventario_page, temperatura_page], position="hidden")
-pg.run()
-
-# ─────────────────────────────────────────────
-# ESTILOS CSS: ESTÉTICA DIVERTIDA Y MODERNA
-# ─────────────────────────────────────────────
+# Inyección de CSS para simular el chasis de la nevera y quitar el estilo genérico de Streamlit
 st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Quicksand:wght@500;700&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Quicksand', sans-serif !important;
-    }
-
+    <style>
+    /* Ocultar elementos nativos de Streamlit (menú, footer, header y barra lateral) */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="collapsedControl"] {display: none;}
+    
+    /* Fondo general de la página (ambiente exterior) */
     .stApp {
-        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%) !important;
+        background-color: #1e2226;
+        font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
     }
 
-    .fridge-door {
-        background: #ffffff;
-        border: 6px solid #0284c7;
-        border-radius: 24px;
-        padding: 30px;
-        box-shadow: 0 15px 35px rgba(2, 132, 199, 0.2);
+    /* Contenedor principal que simula el cuerpo de acero inoxidable de la nevera */
+    .main .block-container {
+        background: linear-gradient(135deg, #d8dee3 0%, #b8c2cc 50%, #9aa6b2 100%);
+        border-radius: 28px;
+        border: 8px solid #6c7680;
+        box-shadow: 
+            inset 0 0 25px rgba(255, 255, 255, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.7);
+        padding: 2.5rem 2.5rem 3.5rem 2.5rem;
+        max-width: 580px;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Marco superior e identidad de marca (estilo placa metálica) */
+    .brand-plate {
         text-align: center;
+        color: #3b4249;
+        font-weight: 800;
+        letter-spacing: 5px;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        margin-bottom: 1.5rem;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.8);
+    }
+
+    /* Pantalla digital empotrada (Hub de estado) */
+    .led-screen {
+        background-color: #0d1217;
+        border: 4px solid #454d55;
+        border-radius: 14px;
+        padding: 22px;
+        color: #00e5ff;
+        text-align: center;
+        box-shadow: inset 0 0 18px rgba(0, 229, 255, 0.15);
         margin-bottom: 25px;
     }
 
-    @keyframes float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-6px); }
-        100% { transform: translateY(0px); }
+    .led-title {
+        font-size: 0.75rem;
+        color: #6c8090;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
     }
 
-    .animated-fridge {
-        animation: float 4s ease-in-out infinite;
-        font-size: 4rem;
-        margin-bottom: 10px;
+    .led-metrics {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        font-family: 'Courier New', Courier, monospace;
+        margin-top: 10px;
     }
 
-    h1 {
-        font-family: 'Fredoka', cursive !important;
-        color: #0369a1 !important;
-        font-size: 2.5rem !important;
+    .metric-box {
+        text-align: center;
     }
 
-    p {
-        color: #334155 !important;
-        font-size: 1.1rem !important;
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #e0f7fa;
+        text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
     }
 
-    /* Estilo de los botones principales */
-    .stButton button {
-        background: #ffffff !important;
-        border: 3px solid #0284c7 !important;
-        border-radius: 16px !important;
-        color: #0369a1 !important;
-        font-family: 'Fredoka', cursive !important;
-        font-size: 1.3rem !important;
-        padding: 30px 10px !important;
-        box-shadow: 0 6px 15px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
+    .metric-label {
+        font-size: 0.7rem;
+        color: #4dd0e1;
+        text-transform: uppercase;
+    }
+
+    /* División física entre la puerta superior y la inferior */
+    .door-seal {
+        height: 10px;
+        background: #2b3035;
+        margin: 30px -2.5rem;
+        border-top: 2px solid #555e67;
+        border-bottom: 2px solid #16191c;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    .section-label {
+        color: #2c333a;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        text-align: center;
+    }
+
+    /* Estilización de los botones de Streamlit para que parezcan paneles táctiles físicos */
+    div.stButton > button {
         width: 100%;
+        height: 75px;
+        background: linear-gradient(180deg, #2b333c 0%, #1c2228 100%);
+        color: #e2e8f0;
+        border: 2px solid #4a5568;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255,255,255,0.1);
+        margin-bottom: 12px;
     }
 
-    .stButton button:hover {
-        background: #0284c7 !important;
-        color: #ffffff !important;
-        transform: translateY(-5px);
-        box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
-        border-color: #0369a1 !important;
+    div.stButton > button:hover {
+        background: linear-gradient(180deg, #323c47 0%, #232a31 100%);
+        border-color: #00e5ff;
+        color: #00e5ff;
+        box-shadow: 0 4px 15px rgba(0, 229, 255, 0.25);
+        transform: translateY(-1px);
     }
-</style>
+
+    div.stButton > button:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# INTERFAZ DE LA NEVERA VIRTUAL (HOME)
-# ─────────────────────────────────────────────
+# 1. Placa de marca superior
+st.markdown('<div class="brand-plate">SISTEMA DE CONTROL FRIGORÍFICO</div>', unsafe_allow_html=True)
+
+# 2. Pantalla LED de estado general (Puerta Superior)
 st.markdown("""
-<div class="fridge-door">
-    <div class="animated-fridge">🧊🤖</div>
-    <h1>SmartFridge Home</h1>
-    <p>Tu asistente inteligente de cocina, inventario y conservación.</p>
-</div>
+    <div class="led-screen">
+        <div class="led-title">ESTADO DEL SISTEMA : OPERATIVO</div>
+        <div class="led-metrics">
+            <div class="metric-box">
+                <div class="metric-value">3.2°C</div>
+                <div class="metric-label">Refrigerador</div>
+            </div>
+            <div style="height: 40px; width: 1px; background-color: #263238;"></div>
+            <div class="metric-box">
+                <div class="metric-value">-18.0°C</div>
+                <div class="metric-label">Congelador</div>
+            </div>
+            <div style="height: 40px; width: 1px; background-color: #263238;"></div>
+            <div class="metric-box">
+                <div class="metric-value">ECO</div>
+                <div class="metric-label">Modo Energía</div>
+            </div>
+        </div>
+    </div>
 """, unsafe_allow_html=True)
 
-st.markdown("<h3 style='text-align: center; color: #0369a1; font-family: Fredoka;'>🎛️ Panel de Control de la Nevera</h3>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; margin-bottom: 30px;'>Selecciona una sección para navegar directamente:</p>", unsafe_allow_html=True)
+# 3. Sello divisor de puertas
+st.markdown('<div class="door-seal"></div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3, gap="medium")
+# 4. Panel de navegación (Puerta Inferior)
+st.markdown('<div class="section-label">Módulos de Monitoreo</div>', unsafe_allow_html=True)
 
-with col1:
-    if st.button("⚡\n\n Energía", use_container_width=True):
-        st.switch_page(energia_page)
+# Botones de navegación con redirección mediante st.switch_page
+if st.button("CONTROL DE TEMPERATURA", use_container_width=True):
+    st.switch_page("pages/temperatura.py")
 
-with col2:
-    if st.button("📷\n\n Inventario", use_container_width=True):
-        st.switch_page(inventario_page)
+if st.button("GESTIÓN DE INVENTARIO", use_container_width=True):
+    st.switch_page("pages/inventario.py")
 
-with col3:
-    if st.button("🌡️\n\n Temperatura", use_container_width=True):
-        st.switch_page(temperatura_page)
+if st.button("CONSUMO DE ENERGÍA", use_container_width=True):
+    st.switch_page("pages/energia.py")
