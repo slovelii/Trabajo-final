@@ -1,4 +1,5 @@
 import streamlit as st
+from pages import temperatura, inventario, energia
 
 st.set_page_config(
     page_title="Panel de Control - Nevera Inteligente",
@@ -6,12 +7,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-def vista_inicio():
+# Inicializar la pantalla activa en memoria
+if "vista_actual" not in st.session_state:
+    st.session_state["vista_actual"] = "inicio"
+
+# Ocultar siempre la barra lateral nativa de Streamlit para evitar el menú automático de /pages
+st.markdown("""
+    <style>
+    #MainMenu, footer, header {visibility: hidden;}
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] {display: none;}
+    </style>
+""", unsafe_allow_html=True)
+
+def renderizar_inicio():
     st.markdown("""
         <style>
-        #MainMenu, footer, header {visibility: hidden;}
-        [data-testid="stSidebar"], [data-testid="collapsedControl"] {display: none;}
-        
         .stApp {
             background-color: #1e2226;
             font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
@@ -143,22 +153,25 @@ def vista_inicio():
     st.markdown('<div class="section-label">Módulos de Monitoreo</div>', unsafe_allow_html=True)
 
     if st.button("CONTROL DE TEMPERATURA", use_container_width=True):
-        st.switch_page(pag_temperatura)
+        st.session_state["vista_actual"] = "temperatura"
+        st.rerun()
 
     if st.button("GESTIÓN DE INVENTARIO", use_container_width=True):
-        st.switch_page(pag_inventario)
+        st.session_state["vista_actual"] = "inventario"
+        st.rerun()
 
     if st.button("CONSUMO DE ENERGÍA", use_container_width=True):
-        st.switch_page(pag_energia)
+        st.session_state["vista_actual"] = "energia"
+        st.rerun()
 
-# Registro directo con rutas relativas exactas según tu GitHub
-pag_inicio = st.Page(vista_inicio, title="Panel Principal", default=True)
-pag_temperatura = st.Page("pages/temperatura.py", title="Temperatura")
-pag_inventario = st.Page("pages/inventario.py", title="Inventario")
-pag_energia = st.Page("pages/energia.py", title="Energía")
+# Enrutador por estado en memoria
+vista = st.session_state["vista_actual"]
 
-# Guardamos pag_inicio en session_state para que las otras páginas vuelvan sin errores
-st.session_state["pag_inicio"] = pag_inicio
-
-pg = st.navigation([pag_inicio, pag_temperatura, pag_inventario, pag_energia], position="hidden")
-pg.run()
+if vista == "inicio":
+    renderizar_inicio()
+elif vista == "temperatura":
+    temperatura.mostrar()
+elif vista == "inventario":
+    inventario.mostrar()
+elif vista == "energia":
+    energia.mostrar()
