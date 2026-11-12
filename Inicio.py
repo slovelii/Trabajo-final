@@ -1,14 +1,21 @@
 import streamlit as st
 
-# ─────────────────────────────────────────────
-# CONFIGURACIÓN DE PÁGINA
-# ─────────────────────────────────────────────
 st.set_page_config(
     page_title="SmartFridge IoT 🧊 — Centro de Control",
     page_icon="🧊",
     layout="centered",
     initial_sidebar_state="expanded"
 )
+
+# 1. Definir todas las páginas (incluyendo el inicio)
+home_page = st.Page("Inicio.py", title="Inicio", icon="🏠", default=True)
+energia_page = st.Page("pages/energia.py", title="Energía", icon="⚡")
+inventario_page = st.Page("pages/inventario.py", title="Inventario", icon="📷")
+temperatura_page = st.Page("pages/temperatura.py", title="Temperatura", icon="🌡️")
+
+# 2. Registrar la navegación global (ocultando la barra lateral para mantener tu diseño limpio)
+pg = st.navigation([home_page, energia_page, inventario_page, temperatura_page], position="hidden")
+pg.run()
 
 # ─────────────────────────────────────────────
 # ESTILOS CSS: ESTÉTICA DIVERTIDA Y MODERNA
@@ -100,12 +107,12 @@ col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
     if st.button("⚡\n\n Energía", use_container_width=True):
-        st.switch_page("pages/energia.py")
+        st.switch_page(energia_page)
 
 with col2:
     if st.button("📷\n\n Inventario", use_container_width=True):
-        st.switch_page("pages/inventario.py")
+        st.switch_page(inventario_page)
 
 with col3:
     if st.button("🌡️\n\n Temperatura", use_container_width=True):
-        st.switch_page("pages/temperatura.py")
+        st.switch_page(temperatura_page)
