@@ -145,6 +145,10 @@ header {visibility: hidden;}
 .mag-right { transform: rotate(10deg); }
 
 .brand-plate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     background: linear-gradient(180deg, #FBF9F5 0%, #EAE4D8 100%);
     border: 2.5px solid #C96A52;
     border-radius: 999px;
@@ -409,11 +413,19 @@ div.stButton > button:active,
 </style>
 """, unsafe_allow_html=True)
 
-# 1. Placa de marca superior con imanes discretos
+# 1. Placa de marca superior con imanes discretos e ícono SVG de nevera
 st.markdown("""
 <div class="fridge-top-bar">
     <div class="magnet-pill mag-left">🥑</div>
-    <div class="brand-plate">❄️ MI NEVERA INTERACTIVA</div>
+    <div class="brand-plate">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="5" y="2" width="14" height="20" rx="3" fill="#779F95" stroke="#36524B" stroke-width="1.8"/>
+            <line x1="5" y1="9.5" x2="19" y2="9.5" stroke="#36524B" stroke-width="1.8"/>
+            <line x1="8.5" y1="5" x2="8.5" y2="7.5" stroke="#F7F4EE" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8.5" y1="12" x2="8.5" y2="16" stroke="#F7F4EE" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>MI NEVERA INTERACTIVA</span>
+    </div>
     <div class="magnet-pill mag-right">🍓</div>
 </div>
 """, unsafe_allow_html=True)
