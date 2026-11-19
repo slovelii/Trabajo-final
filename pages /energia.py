@@ -1,18 +1,16 @@
-import sys
-import subprocess
 import time
 import json
-import platform
 import streamlit as st
 
 # ─────────────────────────────────────────────
-# AUTO-INSTALACIÓN Y CARGA SEGURA DE PAHO-MQTT EN STREAMLIT CLOUD
+# CARGA SEGURA DE PAHO-MQTT (Requiere paho-mqtt en requirements.txt)
 # ─────────────────────────────────────────────
 try:
     import paho.mqtt.client as paho
+    MQTT_DISPONIBLE = True
 except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "paho-mqtt"])
-    import paho.mqtt.client as paho
+    paho = None
+    MQTT_DISPONIBLE = False
 
 def crear_cliente_mqtt(client_id):
     """Crea el cliente MQTT compatible con paho-mqtt 1.x y 2.x."""
@@ -128,7 +126,7 @@ header {visibility: hidden;}
     box-shadow:
         0 6px 0 rgba(45, 74, 67, 0.28),
         inset 0 0 18px rgba(148, 197, 219, 0.12);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .led-title {
@@ -162,6 +160,16 @@ header {visibility: hidden;}
     font-size: 0.88rem;
     margin: 4px 0 0 0;
     line-height: 1.4;
+}
+
+.sensor-readout {
+    margin-top: 12px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1.5px solid rgba(147, 197, 224, 0.4);
+    border-radius: 14px;
+    padding: 10px 12px;
+    color: #E0F2FE;
+    font-size: 0.84rem;
 }
 
 /* Tarjeta en la puerta con línea y tabla de energía */
@@ -415,19 +423,39 @@ div.stButton > button:active,
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# CONFIGURACIÓN MQTT PARA CONECTAR LA NEVERA CON WOKWI
+# CONFIGURACIÓN MQTT Y ESTADO DEL SLIDER
 # ─────────────────────────────────────────────
 broker = "157.230.214.127"
 port = 1883
+TOPICO_SENSOR = "Sensor/Susapiro_Marín"
+
+if "ultima_lectura_sensor" not in st.session_state:
+    st.session_state.ultima_lectura_sensor = "Sin lecturas aún. Pulsa el botón para consultar."
+
+if "nivel_energia" not in st.session_state:
+    st.session_state.nivel_energia = 50.0
 
 def on_publish(client, userdata, result):
     print("Dato de energía de la nevera publicado con éxito \n")
 
-def on_message(client, userdata, message):
-    global message_received
-    time.sleep(1)
-    message_received = str(message.payload.decode("utf-8"))
-    st.info(f"🛰️ Respuesta de la nevera en Wokwi: {message_received}")
+def leer_topico_sensor(timeout_seg=1.5):
+    """Se suscribe brevemente a Sensor/Susapiro_Marín para capturar el último dato."""
+    mensajes = []
+
+    def al_recibir(client, userdata, message):
+        mensajes.append(message.payload.decode("utf-8", errors="replace"))
+
+    cliente = crear_cliente_mqtt(f"NEVERA-SUB-{int(time.time())}")
+    cliente.on_message = al_recibir
+    cliente.connect(broker, port)
+    cliente.subscribe(TOPICO_SENSOR)
+
+    fin = time.time() + timeout_seg
+    while time.time() < fin and not mensajes:
+        cliente.loop(timeout=0.1)
+
+    cliente.disconnect()
+    return mensajes[-1] if mensajes else None
 
 # ─────────────────────────────────────────────
 # 1. PLACA SUPERIOR DE LA NEVERA CON ÍCONO SVG E IMANES
@@ -448,8 +476,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+if not MQTT_DISPONIBLE:
+    st.warning("⚠️ Falta instalar `paho-mqtt` en el servidor. Agrega `paho-mqtt` al archivo `requirements.txt` en la raíz de tu GitHub para activar el envío a Wokwi.")
+
 # ─────────────────────────────────────────────
-# 2. PANTALLA DIGITAL DE LA NEVERA (CONTROL REMOTO)
+# 2. PANTALLA DIGITAL DE LA NEVERA (CONTROL REMOTO + SUBSCRIBE)
 # ─────────────────────────────────────────────
 st.markdown(f"""
 <div class="led-screen">
@@ -462,8 +493,26 @@ st.markdown(f"""
     <p class="led-subtitle">
         Regula desde cualquier lugar cuánta energía recibe tu nevera: usa <b>Modo Eco (20%)</b> para ahorrar o <b>Modo Turbo (100%)</b> para enfriar tus alimentos al máximo.
     </p>
+    <div class="sensor-readout">
+        <b>📡 Subscribe ({TOPICO_SENSOR}):</b> {st.session_state.ultima_lectura_sensor}
+    </div>
 </div>
 """, unsafe_allow_html=True)
+
+if st.button(f"🔄 Consultar {TOPICO_SENSOR}", use_container_width=True):
+    if not MQTT_DISPONIBLE:
+        st.error("Agrega `paho-mqtt` a `requirements.txt` para leer el tópico MQTT.")
+    else:
+        try:
+            with st.spinner(f"Escuchando {TOPICO_SENSOR}..."):
+                dato = leer_topico_sensor()
+            if dato is not None:
+                st.session_state.ultima_lectura_sensor = dato
+                st.rerun()
+            else:
+                st.info(f"No llegó ningún mensaje nuevo en `{TOPICO_SENSOR}` durante la consulta.")
+        except Exception as e:
+            st.error(f"Error al consultar `{TOPICO_SENSOR}`: {e}")
 
 # ─────────────────────────────────────────────
 # 3. LÍNEA Y TABLA DE CONSERVACIÓN DE ALIMENTOS POR ENERGÍA
@@ -539,29 +588,35 @@ col1, col2 = st.columns(2)
 
 with col1:
     if st.button('🟢 ENCENDER NEVERA (ON)', use_container_width=True):
-        try:
-            act1 = "ON"
-            client1 = crear_cliente_mqtt("NEVERA-ON")
-            client1.on_publish = on_publish
-            client1.connect(broker, port)
-            message = json.dumps({"Act1": act1})
-            client1.publish("cmqtt_s", message)
-            st.success("❄️ ¡Compresor de la nevera encendido en Wokwi!")
-        except Exception as e:
-            st.error(f"No se pudo conectar con el broker MQTT: {e}")
+        st.session_state.nivel_energia = 100.0
+        if not MQTT_DISPONIBLE:
+            st.error("Agrega `paho-mqtt` a `requirements.txt` para enviar comandos a Wokwi.")
+        else:
+            try:
+                client1 = crear_cliente_mqtt("NEVERA-ON")
+                client1.on_publish = on_publish
+                client1.connect(broker, port)
+                client1.publish("cmqtt_s", json.dumps({"Act1": "ON"}))
+                client1.publish("cmqtt_a", json.dumps({"Analog": 100.0}))
+                st.success("❄️ ¡Nevera encendida al 100% (Modo Turbo) en Wokwi!")
+            except Exception as e:
+                st.error(f"No se pudo conectar con el broker MQTT: {e}")
 
 with col2:
     if st.button('🟠 MODO ESPERA (OFF)', use_container_width=True):
-        try:
-            act1 = "OFF"
-            client1 = crear_cliente_mqtt("NEVERA-OFF")
-            client1.on_publish = on_publish
-            client1.connect(broker, port)
-            message = json.dumps({"Act1": act1})
-            client1.publish("cmqtt_s", message)
-            st.warning("🌙 ¡Compresor en pausa! Recuerda no dejar comida perecedera sin refrigeración.")
-        except Exception as e:
-            st.error(f"No se pudo conectar con el broker MQTT: {e}")
+        st.session_state.nivel_energia = 0.0
+        if not MQTT_DISPONIBLE:
+            st.error("Agrega `paho-mqtt` a `requirements.txt` para enviar comandos a Wokwi.")
+        else:
+            try:
+                client1 = crear_cliente_mqtt("NEVERA-OFF")
+                client1.on_publish = on_publish
+                client1.connect(broker, port)
+                client1.publish("cmqtt_s", json.dumps({"Act1": "OFF"}))
+                client1.publish("cmqtt_a", json.dumps({"Analog": 0.0}))
+                st.warning("🌙 ¡Compresor en modo espera (0%)! Recuerda no dejar comida perecedera sin refrigeración.")
+            except Exception as e:
+                st.error(f"No se pudo conectar con el broker MQTT: {e}")
 
 # ─────────────────────────────────────────────
 # 6. REGULADOR DE PORCENTAJE DE ENERGÍA (SLIDER A WOKWI)
@@ -570,7 +625,9 @@ st.markdown('<div class="section-label">🎚️ Porcentaje de Energía (Eco 20% 
 
 values = st.slider(
     'Selecciona el porcentaje de energía que recibirá tu nevera:',
-    0.0, 100.0, 50.0
+    min_value=0.0,
+    max_value=100.0,
+    key="nivel_energia"
 )
 
 # Visor dinámico que evalúa si el porcentaje protege o pone en riesgo la comida
@@ -612,18 +669,21 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.button('📡 Enviar Energía a la Nevera (Wokwi)', use_container_width=True):
-    try:
-        client1 = crear_cliente_mqtt("NEVERA-ENERGIA")
-        client1.on_publish = on_publish
-        client1.connect(broker, port)
-        message = json.dumps({"Analog": float(values)})
-        client1.publish("cmqtt_a", message)
-        if values == 0:
-            st.warning("⚠️ Se envió 0% de energía a la nevera en Wokwi. ¡Retira los alimentos para que no se dañen!")
-        else:
-            st.success(f"🚀 ¡Energía de la nevera ajustada al {values}% y enviada a Wokwi con éxito!")
-    except Exception as e:
-        st.error(f"No se pudo enviar el porcentaje al broker MQTT: {e}")
+    if not MQTT_DISPONIBLE:
+        st.error("Agrega `paho-mqtt` a `requirements.txt` para enviar comandos a Wokwi.")
+    else:
+        try:
+            client1 = crear_cliente_mqtt("NEVERA-ENERGIA")
+            client1.on_publish = on_publish
+            client1.connect(broker, port)
+            message = json.dumps({"Analog": float(values)})
+            client1.publish("cmqtt_a", message)
+            if values == 0:
+                st.warning("⚠️ Se envió 0% de energía a la nevera en Wokwi. ¡Retira los alimentos para que no se dañen!")
+            else:
+                st.success(f"🚀 ¡Energía de la nevera ajustada al {values}% y enviada a Wokwi con éxito!")
+        except Exception as e:
+            st.error(f"No se pudo enviar el porcentaje al broker MQTT: {e}")
 
 # ─────────────────────────────────────────────
 # 7. IMANES DE COMIDA EN LA BASE DE LA PUERTA
