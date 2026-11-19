@@ -1,15 +1,29 @@
-import paho.mqtt.client as paho
+import sys
+import subprocess
 import time
-import streamlit as st
 import json
 import platform
+import streamlit as st
 
 # ─────────────────────────────────────────────
-# CONFIGURACIÓN DE LA PÁGINA (Compatible con el Panel Principal)
+# AUTO-INSTALACIÓN Y CARGA SEGURA DE PAHO-MQTT EN STREAMLIT CLOUD
 # ─────────────────────────────────────────────
 try:
+    import paho.mqtt.client as paho
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "paho-mqtt"])
+    import paho.mqtt.client as paho
+
+def crear_cliente_mqtt(client_id):
+    """Crea el cliente MQTT compatible con paho-mqtt 1.x y 2.x."""
+    if hasattr(paho, "CallbackAPIVersion"):
+        return paho.Client(paho.CallbackAPIVersion.VERSION1, client_id)
+    return paho.Client(client_id)
+
+# Configuración protegida por si se abre directo o desde el Panel Principal
+try:
     st.set_page_config(
-        page_title="Control de Energía — Nevera Inteligente",
+        page_title="Consumo de Energía - Nevera Inteligente",
         page_icon="⚡",
         layout="centered",
         initial_sidebar_state="collapsed"
@@ -18,7 +32,7 @@ except Exception:
     pass
 
 # ─────────────────────────────────────────────
-# ESTILOS CSS: NEVERA RETRO VERDE SALVIA MATE
+# ESTILOS CSS: PUERTA DE LA NEVERA RETRO (MISMA TEMÁTICA DEL PROYECTO)
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -27,6 +41,7 @@ st.markdown("""
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
+[data-testid="stSidebar"], [data-testid="collapsedControl"] {display: none;}
 
 /* Fondo de cocina cálida con azulejos suaves y mate */
 .stApp {
@@ -40,13 +55,7 @@ header {visibility: hidden;}
     font-family: 'Nunito', sans-serif !important;
 }
 
-/* Barra lateral integrada con la paleta crema/salvia */
-[data-testid="stSidebar"] {
-    background-color: #F7F4EE !important;
-    border-right: 3px solid #92B6AC !important;
-}
-
-/* Cuerpo principal estilo nevera retro verde salvia mate */
+/* Cuerpo principal de la nevera retro verde salvia mate */
 .main .block-container,
 [data-testid="stMainBlockContainer"] {
     background: linear-gradient(165deg, #B9D2CA 0%, #92B6AC 48%, #779F95 100%);
@@ -58,13 +67,13 @@ header {visibility: hidden;}
         inset -10px -12px 24px rgba(34, 62, 56, 0.22),
         0 24px 48px rgba(38, 56, 52, 0.25);
     padding: 2rem 2.2rem 2.4rem 2.2rem !important;
-    max-width: 620px !important;
+    max-width: 600px !important;
     margin-top: 1.5rem;
     margin-bottom: 2rem;
     position: relative;
 }
 
-/* Barra superior con imanes discretos y placa retro */
+/* Barra superior con imanes discretos y placa retro de la nevera */
 .fridge-top-bar {
     display: flex;
     justify-content: space-between;
@@ -109,7 +118,7 @@ header {visibility: hidden;}
     box-shadow: 0 4px 0 rgba(38, 78, 59, 0.3), 0 6px 14px rgba(38, 56, 52, 0.14);
 }
 
-/* Pantalla digital empotrada */
+/* Pantalla digital de la nevera */
 .led-screen {
     background: linear-gradient(145deg, #1E293B 0%, #263449 55%, #1A2433 100%);
     border: 4px solid #DDD3BE;
@@ -149,52 +158,26 @@ header {visibility: hidden;}
 }
 
 .led-subtitle {
-    color: #CBD5E1;
+    color: #CBD5E1 !important;
     font-size: 0.88rem;
     margin: 4px 0 0 0;
     line-height: 1.4;
 }
 
-/* Nota adhesiva color crema */
-.sticky-note {
-    background: linear-gradient(180deg, #F8F0D2 0%, #EFE2B5 100%);
-    color: #544626;
-    border-radius: 14px 14px 24px 14px;
-    padding: 12px 16px;
-    margin: 0 auto 16px auto;
-    text-align: center;
-    font-family: 'Fredoka', cursive, sans-serif;
-    font-size: 0.94rem;
-    font-weight: 500;
-    box-shadow: 0 5px 0 rgba(145, 118, 63, 0.22), 0 8px 16px rgba(0, 0, 0, 0.1);
-    transform: rotate(-0.6deg);
-    border: 2px solid #FBF6E6;
-}
-
-.sticky-pin {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    background: radial-gradient(circle at 35% 35%, #E08A74, #B84A39);
-    border-radius: 50%;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.28);
-    margin-bottom: 3px;
-}
-
-/* Línea visual y tabla de recomendaciones de energía */
+/* Tarjeta en la puerta con línea y tabla de energía */
 .energy-guide-card {
-    background: rgba(247, 244, 238, 0.92);
+    background: rgba(247, 244, 238, 0.94);
     border: 3px solid #F7F4EE;
     border-radius: 20px;
     padding: 16px;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
     box-shadow: 0 6px 14px rgba(33, 64, 58, 0.14);
 }
 
 .guide-title {
     font-family: 'Fredoka', cursive, sans-serif;
     color: #21403A;
-    font-size: 1rem;
+    font-size: 0.98rem;
     font-weight: 600;
     margin-bottom: 10px;
     text-align: center;
@@ -202,7 +185,7 @@ header {visibility: hidden;}
     letter-spacing: 0.8px;
 }
 
-/* Barra/Línea cromática de zonas de energía */
+/* Línea visual de zonas de energía de la nevera */
 .energy-line-bar {
     display: flex;
     width: 100%;
@@ -219,7 +202,7 @@ header {visibility: hidden;}
 }
 
 .seg-danger {
-    width: 15%;
+    width: 18%;
     background: #C85A48;
     display: flex;
     align-items: center;
@@ -227,7 +210,7 @@ header {visibility: hidden;}
 }
 
 .seg-eco {
-    width: 25%;
+    width: 24%;
     background: #4E8C6E;
     display: flex;
     align-items: center;
@@ -235,7 +218,7 @@ header {visibility: hidden;}
 }
 
 .seg-normal {
-    width: 35%;
+    width: 33%;
     background: #4384A6;
     display: flex;
     align-items: center;
@@ -260,11 +243,11 @@ header {visibility: hidden;}
     padding: 0 4px;
 }
 
-/* Tabla estilizada de recomendaciones */
+/* Tabla de conservación de alimentos por nivel de energía */
 .energy-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
+    font-size: 0.81rem;
     color: #1E293B;
 }
 
@@ -294,7 +277,7 @@ header {visibility: hidden;}
     border-radius: 999px;
     font-family: 'Fredoka', cursive, sans-serif;
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     color: #FFFFFF;
     white-space: nowrap;
 }
@@ -307,7 +290,7 @@ header {visibility: hidden;}
 /* Sello divisor de puertas y manija cromada */
 .door-seal-wrap {
     position: relative;
-    margin: 22px -2.2rem 18px -2.2rem;
+    margin: 20px -2.2rem 16px -2.2rem;
 }
 
 .door-seal {
@@ -328,29 +311,55 @@ header {visibility: hidden;}
     box-shadow: 0 4px 8px rgba(30, 41, 59, 0.18), inset 0 2px 2px #FFFFFF;
 }
 
+/* Nota adhesiva color crema en la puerta de la nevera */
+.sticky-note {
+    background: linear-gradient(180deg, #F8F0D2 0%, #EFE2B5 100%);
+    color: #544626;
+    border-radius: 14px 14px 24px 14px;
+    padding: 12px 16px;
+    margin: 0 auto 16px auto;
+    text-align: center;
+    font-family: 'Fredoka', cursive, sans-serif;
+    font-size: 0.93rem;
+    font-weight: 500;
+    box-shadow: 0 5px 0 rgba(145, 118, 63, 0.22), 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: rotate(-0.6deg);
+    border: 2px solid #FBF6E6;
+}
+
+.sticky-pin {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: radial-gradient(circle at 35% 35%, #E08A74, #B84A39);
+    border-radius: 50%;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.28);
+    margin-bottom: 3px;
+}
+
 .section-label {
     color: #21403A;
     font-family: 'Fredoka', cursive, sans-serif;
-    font-size: 1rem;
+    font-size: 0.98rem;
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
-    margin: 10px 0 12px 0;
+    margin: 10px 0 10px 0;
     text-align: center;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-/* Botones táctiles 3D */
+/* Botones táctiles 3D en la puerta de la nevera */
 div.stButton > button,
 [data-testid="stButton"] > button {
     width: 100%;
-    min-height: 64px;
+    min-height: 62px;
     background: linear-gradient(135deg, #4E8C6E 0%, #386F54 100%) !important;
     color: #FBF9F5 !important;
     border: 3px solid #F7F4EE !important;
     border-radius: 18px !important;
     font-family: 'Fredoka', cursive, sans-serif !important;
-    font-size: 1.02rem !important;
+    font-size: 1rem !important;
     font-weight: 600 !important;
     letter-spacing: 0.8px;
     text-transform: uppercase;
@@ -363,7 +372,7 @@ div.stButton > button p,
 [data-testid="stButton"] > button p,
 div.stButton > button span {
     font-family: 'Fredoka', cursive, sans-serif !important;
-    font-size: 1.02rem !important;
+    font-size: 1rem !important;
     font-weight: 600 !important;
     color: #FBF9F5 !important;
     margin: 0 !important;
@@ -382,17 +391,17 @@ div.stButton > button:active,
     box-shadow: 0 3px 0 #234A37 !important;
 }
 
-/* Etiquetas del slider legibles sobre la puerta de la nevera */
+/* Texto del slider sobre la nevera */
 .stSlider label p {
     color: #1B3631 !important;
     font-family: 'Nunito', sans-serif !important;
     font-weight: 800 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.94rem !important;
 }
 
-/* Franja decorativa inferior con imanes de alimentos */
+/* Imanes decorativos inferiores */
 .fridge-magnets-footer {
-    margin-top: 16px;
+    margin-top: 14px;
     background: rgba(247, 244, 238, 0.42);
     border: 2px dashed rgba(247, 244, 238, 0.75);
     border-radius: 18px;
@@ -406,34 +415,22 @@ div.stButton > button:active,
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# VARIABLES DE ESTADO Y CONFIGURACIÓN MQTT (WOKWI)
+# CONFIGURACIÓN MQTT PARA CONECTAR LA NEVERA CON WOKWI
 # ─────────────────────────────────────────────
 broker = "157.230.214.127"
 port = 1883
 
 def on_publish(client, userdata, result):
-    print("El dato ha sido publicado con éxito \n")
-    pass
+    print("Dato de energía de la nevera publicado con éxito \n")
 
 def on_message(client, userdata, message):
     global message_received
     time.sleep(1)
     message_received = str(message.payload.decode("utf-8"))
-    st.info(f"🛰️ Respuesta de la nevera (Wokwi): {message_received}")
+    st.info(f"🛰️ Respuesta de la nevera en Wokwi: {message_received}")
 
 # ─────────────────────────────────────────────
-# BARRA LATERAL: INFORMACIÓN DE CONEXIÓN REMOTA
-# ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### ⚡ Control Energético Remoto")
-    st.markdown("Regula la potencia que recibe tu nevera desde cualquier lugar y protege tus alimentos mientras ahorras energía.")
-    st.divider()
-    st.markdown(f"💻 **Entorno:** Python {platform.python_version()}")
-    st.markdown(f"🌐 **Broker MQTT:** `{broker}`")
-    st.markdown("🟢 **Enlace Wokwi:** Listo para publicar")
-
-# ─────────────────────────────────────────────
-# 1. PLACA SUPERIOR CON ÍCONO SVG DE NEVERA E IMANES
+# 1. PLACA SUPERIOR DE LA NEVERA CON ÍCONO SVG E IMANES
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="fridge-top-bar">
@@ -445,75 +442,75 @@ st.markdown("""
             <line x1="8.5" y1="5" x2="8.5" y2="7.5" stroke="#F7F4EE" stroke-width="2" stroke-linecap="round"/>
             <line x1="8.5" y1="12" x2="8.5" y2="16" stroke="#F7F4EE" stroke-width="2" stroke-linecap="round"/>
         </svg>
-        <span>ENERGÍA &amp; MODOS REMOTOS</span>
+        <span>CONSUMO DE ENERGÍA</span>
     </div>
     <div class="magnet-pill mag-right">🍋</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# 2. PANTALLA SUPERIOR: ENCABEZADO DEL MÓDULO
+# 2. PANTALLA DIGITAL DE LA NEVERA (CONTROL REMOTO)
 # ─────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
 <div class="led-screen">
     <div class="led-title">
-        <span class="mqtt-dot"></span> CONTROL REMOTO FUERA DE CASA · MQTT WOKWI
+        <span class="mqtt-dot"></span> CONTROL REMOTO DE NEVERA · BROKER {broker}
     </div>
-    <h2 style="color: #F8FAFC !important; font-family: 'Fredoka', cursive, sans-serif; margin: 4px 0 6px 0; font-size: 1.45rem;">
-        ⚡ Gestión de Potencia de tu Nevera
+    <h2 style="color: #F8FAFC !important; font-family: 'Fredoka', cursive, sans-serif; margin: 4px 0 6px 0; font-size: 1.4rem;">
+        ⚡ Potencia del Compresor Fuera de Casa
     </h2>
     <p class="led-subtitle">
-        Ajusta cuánta energía recibe el compresor estés donde estés: activa el <b>Modo Eco (20%)</b> para ahorrar o el <b>Modo Turbo (100%)</b> para enfriamiento rápido.
+        Regula desde cualquier lugar cuánta energía recibe tu nevera: usa <b>Modo Eco (20%)</b> para ahorrar o <b>Modo Turbo (100%)</b> para enfriar tus alimentos al máximo.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# 3. LÍNEA VISUAL Y TABLA DE RECOMENDACIONES DE ENERGÍA
+# 3. LÍNEA Y TABLA DE CONSERVACIÓN DE ALIMENTOS POR ENERGÍA
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="energy-guide-card">
-    <div class="guide-title">📊 Línea y Guía de Potencia Recomendada</div>
+    <div class="guide-title">📊 Línea de Energía y Cuidado de Alimentos</div>
     <div class="energy-line-bar">
         <div class="seg-danger">0%-15% ⚠️</div>
         <div class="seg-eco">20% ECO 🌿</div>
-        <div class="seg-normal">50%-75% IDEAL 🥛</div>
+        <div class="seg-normal">50%-75% DIARIO 🥛</div>
         <div class="seg-turbo">100% TURBO ❄️</div>
     </div>
     <div class="energy-scale-labels">
-        <span>0% (Sin frío)</span>
-        <span>20% (Ahorro)</span>
-        <span>60% (Estándar)</span>
-        <span>100% (Máximo)</span>
+        <span>0% (Riesgo comida)</span>
+        <span>20% (Modo Eco)</span>
+        <span>60% (Ideal)</span>
+        <span>100% (Modo Turbo)</span>
     </div>
     <table class="energy-table">
         <thead>
             <tr>
-                <th>Potencia / Modo</th>
-                <th>¿Cuándo se recomienda?</th>
-                <th>Efecto en Alimentos</th>
+                <th>Nivel de Energía</th>
+                <th>¿Cuándo usarlo en tu nevera?</th>
+                <th>Impacto en tus Alimentos</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td><span class="badge-mode b-zero">0% · Apagado</span></td>
-                <td><b>Solo con nevera vacía</b> (limpieza o mudanza).</td>
-                <td>⚠️ <b>No recomendable con comida:</b> rompe la cadena de frío y daña lácteos, carnes y vegetales.</td>
+                <td><span class="badge-mode b-zero">0% · Sin frío</span></td>
+                <td><b>Solo con la nevera vacía</b> (limpieza o descongelación).</td>
+                <td>⚠️ <b>No recomendado con alimentos:</b> el calor interno daña carnes, lácteos y verduras.</td>
             </tr>
             <tr>
                 <td><span class="badge-mode b-eco">20% · Modo Eco</span></td>
-                <td>Fuera de casa por horas/vacaciones o con pocos productos.</td>
-                <td>🌿 Mantiene frescura base en bebidas, frutas resistentes y conservas con mínimo consumo.</td>
+                <td>Fuera de casa, viajes o cuando hay pocos alimentos y la puerta no se abre.</td>
+                <td>🌿 Conserva bebidas, frutas enteras y frascos con ahorro máximo de energía.</td>
             </tr>
             <tr>
-                <td><span class="badge-mode b-norm">50%-75% · Diario</span></td>
-                <td>Uso cotidiano con carga normal de mercado en casa.</td>
-                <td>🥛 Temperatura óptima para lácteos (3.2°C), verduras frescas y congelados (-18°C).</td>
+                <td><span class="badge-mode b-norm">50%-75% · Normal</span></td>
+                <td>Uso diario con mercado completo en el hogar.</td>
+                <td>🥛 Mantiene la nevera a ~3.2°C y el congelador a -18°C para todo tipo de comida.</td>
             </tr>
             <tr>
                 <td><span class="badge-mode b-turbo">100% · Modo Turbo</span></td>
-                <td>Recién hecho el mercado, días muy calurosos o congelación rápida.</td>
-                <td>❄️ Golpe de frío intenso para sellar nutrientes en carnes, pescados y helados.</td>
+                <td>Recién guardas el mercado, días muy calurosos o congelación rápida.</td>
+                <td>❄️ Golpe de frío rápido para proteger carnes, pescados, helados y lácteos.</td>
             </tr>
         </tbody>
     </table>
@@ -521,7 +518,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# 4. SELLO DIVISOR DE PUERTAS Y NOTA ADHESIVA
+# 4. DIVISOR DE PUERTAS Y NOTA ADHESIVA
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="door-seal-wrap">
@@ -530,76 +527,82 @@ st.markdown("""
 </div>
 <div class="sticky-note">
     <div class="sticky-pin"></div><br>
-    💡 Tip para tu comida: si sales de viaje y dejas alimentos adentro, usa el <b>Modo Eco (20%)</b> en lugar de apagarla (0%).
+    💡 Consejo para tu nevera: nunca la dejes en <b>0%</b> si hay comida adentro; elige <b>20% (Modo Eco)</b> cuando salgas de casa.
 </div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# 5. INTERRUPTORES PRINCIPALES (COMPRESOR ON / OFF)
+# 5. CONTROL DEL COMPRESOR DE LA NEVERA (ON / OFF A WOKWI)
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">🔌 Alimentación General del Compresor</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">🔌 Compresor General de la Nevera</div>', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button('🟢 ACTIVAR SISTEMA (ON)', use_container_width=True):
-        act1 = "ON"
-        client1 = paho.Client("SUPERMARKET-ON")
-        client1.on_publish = on_publish
-        client1.connect(broker, port)
-        message = json.dumps({"Act1": act1})
-        client1.publish("cmqtt_s", message)
-        st.success("❄️ ¡Compresor de la nevera activado remotamente!")
+    if st.button('🟢 ENCENDER NEVERA (ON)', use_container_width=True):
+        try:
+            act1 = "ON"
+            client1 = crear_cliente_mqtt("NEVERA-ON")
+            client1.on_publish = on_publish
+            client1.connect(broker, port)
+            message = json.dumps({"Act1": act1})
+            client1.publish("cmqtt_s", message)
+            st.success("❄️ ¡Compresor de la nevera encendido en Wokwi!")
+        except Exception as e:
+            st.error(f"No se pudo conectar con el broker MQTT: {e}")
 
 with col2:
-    if st.button('🟠 REPOSO / STANDBY (OFF)', use_container_width=True):
-        act1 = "OFF"
-        client1 = paho.Client("SUPERMARKET-OFF")
-        client1.on_publish = on_publish
-        client1.connect(broker, port)
-        message = json.dumps({"Act1": act1})
-        client1.publish("cmqtt_s", message)
-        st.warning("🌙 ¡Compresor en modo espera! Recuerda no dejar alimentos perecederos sin frío.")
+    if st.button('🟠 MODO ESPERA (OFF)', use_container_width=True):
+        try:
+            act1 = "OFF"
+            client1 = crear_cliente_mqtt("NEVERA-OFF")
+            client1.on_publish = on_publish
+            client1.connect(broker, port)
+            message = json.dumps({"Act1": act1})
+            client1.publish("cmqtt_s", message)
+            st.warning("🌙 ¡Compresor en pausa! Recuerda no dejar comida perecedera sin refrigeración.")
+        except Exception as e:
+            st.error(f"No se pudo conectar con el broker MQTT: {e}")
 
 # ─────────────────────────────────────────────
-# 6. CONTROL ANALÓGICO DE POTENCIA (0% A 100%)
+# 6. REGULADOR DE PORCENTAJE DE ENERGÍA (SLIDER A WOKWI)
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">🎚️ Regulador de Potencia Energética (Eco ↔ Turbo)</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">🎚️ Porcentaje de Energía (Eco 20% ↔ Turbo 100%)</div>', unsafe_allow_html=True)
 
 values = st.slider(
-    'Desliza para elegir el porcentaje de energía que recibe tu nevera:',
+    'Selecciona el porcentaje de energía que recibirá tu nevera:',
     0.0, 100.0, 50.0
 )
 
-# Diagnóstico visual dinámico según el porcentaje seleccionado
+# Visor dinámico que evalúa si el porcentaje protege o pone en riesgo la comida
 if values == 0:
     color_visor = "#9E3B2B"
     icono_modo = "⚠️"
-    nombre_modo = "0% — SIN ENERGÍA (RIESGO PARA ALIMENTOS)"
-    detalle_modo = "No recomendado si tienes comida guardada: los alimentos pueden dañarse."
+    nombre_modo = "0% — PELIGRO: NEVERA SIN ENERGÍA"
+    detalle_modo = "No recomendable con alimentos adentro: se romperá la cadena de frío."
 elif values < 20:
     color_visor = "#B8553D"
     icono_modo = "⚠️"
-    nombre_modo = f"{values:.0f}% — ENERGÍA MUY BAJA"
-    detalle_modo = "Potencia insuficiente para carnes o lácteos. Sube al menos al 20% (Modo Eco)."
+    nombre_modo = f"{values:.0f}% — ENERGÍA INSUFICIENTE PARA COMIDA FRESCA"
+    detalle_modo = "Sube al menos al 20% (Modo Eco) para conservar tus alimentos seguros."
 elif values <= 35:
     color_visor = "#386F54"
     icono_modo = "🌿"
     nombre_modo = f"{values:.0f}% — MODO ECO (AHORRO FUERA DE CASA)"
-    detalle_modo = "Ideal cuando no estás en casa y la puerta permanece cerrada."
+    detalle_modo = "Consumo mínimo ideal cuando estás fuera de casa y la nevera permanece cerrada."
 elif values <= 79:
     color_visor = "#2D6685"
     icono_modo = "🥛"
-    nombre_modo = f"{values:.0f}% — MODO EQUILIBRADO DIARIO"
-    detalle_modo = "Conservación ideal para frutas, verduras, lácteos y congelador."
+    nombre_modo = f"{values:.0f}% — MODO FRESCURA DIARIA"
+    detalle_modo = "Potencia equilibrada para lácteos, frutas, verduras y congelados."
 else:
     color_visor = "#2A4470"
     icono_modo = "❄️"
-    nombre_modo = f"{values:.0f}% — MODO TURBO (MÁXIMA POTENCIA)"
-    detalle_modo = "Enfriamiento acelerado para mercado recién guardado o bebidas rápidas."
+    nombre_modo = f"{values:.0f}% — MODO TURBO (ENFRIAMIENTO RÁPIDO)"
+    detalle_modo = "Potencia máxima para enfriar mercado recién guardado o congelar rápido."
 
 st.markdown(f"""
 <div style="background-color: {color_visor}; border: 3px solid #F7F4EE; border-radius: 18px; padding: 14px 16px; text-align: center; margin-bottom: 14px; box-shadow: 0 5px 12px rgba(0,0,0,0.16);">
-    <div style="font-family: 'Fredoka', cursive, sans-serif; font-size: 1.15rem; font-weight: 600; color: #FFFFFF;">
+    <div style="font-family: 'Fredoka', cursive, sans-serif; font-size: 1.12rem; font-weight: 600; color: #FFFFFF;">
         {icono_modo} {nombre_modo}
     </div>
     <div style="font-family: 'Nunito', sans-serif; font-size: 0.85rem; color: #F1F5F9; margin-top: 4px;">
@@ -608,19 +611,22 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if st.button('📡 Enviar Porcentaje de Energía a la Nevera (Wokwi)', use_container_width=True):
-    client1 = paho.Client("SUPERMARKET-ANALOG")
-    client1.on_publish = on_publish
-    client1.connect(broker, port)
-    message = json.dumps({"Analog": float(values)})
-    client1.publish("cmqtt_a", message)
-    if values == 0:
-        st.warning(f"⚠️ Se envió 0% de energía a Wokwi. ¡Recuerda retirar los alimentos para evitar que se dañen!")
-    else:
-        st.success(f"🚀 ¡Potencia configurada al {values}% enviada correctamente a tu nevera en Wokwi!")
+if st.button('📡 Enviar Energía a la Nevera (Wokwi)', use_container_width=True):
+    try:
+        client1 = crear_cliente_mqtt("NEVERA-ENERGIA")
+        client1.on_publish = on_publish
+        client1.connect(broker, port)
+        message = json.dumps({"Analog": float(values)})
+        client1.publish("cmqtt_a", message)
+        if values == 0:
+            st.warning("⚠️ Se envió 0% de energía a la nevera en Wokwi. ¡Retira los alimentos para que no se dañen!")
+        else:
+            st.success(f"🚀 ¡Energía de la nevera ajustada al {values}% y enviada a Wokwi con éxito!")
+    except Exception as e:
+        st.error(f"No se pudo enviar el porcentaje al broker MQTT: {e}")
 
 # ─────────────────────────────────────────────
-# 7. IMANES DECORATIVOS AL PIE DE LA PUERTA
+# 7. IMANES DE COMIDA EN LA BASE DE LA PUERTA
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="fridge-magnets-footer">
