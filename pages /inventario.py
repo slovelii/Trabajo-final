@@ -1,7 +1,14 @@
 import os
 import base64
+import requests
 import streamlit as st
-from openai import OpenAI
+
+try:
+    from openai import OpenAI
+    OPENAI_DISPONIBLE = True
+except ModuleNotFoundError:
+    OpenAI = None
+    OPENAI_DISPONIBLE = False
 
 # Configuración protegida por si se abre directo o desde el Panel Principal
 try:
@@ -14,8 +21,10 @@ try:
 except Exception:
     pass
 
-def encode_image(image_file):
-    return base64.b64encode(image_file.getvalue()).decode("utf-8")
+def encode_image(image_data):
+    """Codifica tanto archivos subidos/cámara como bytes descargados de una URL."""
+    raw_bytes = image_data if isinstance(image_data, bytes) else image_data.getvalue()
+    return base64.b64encode(raw_bytes).decode("utf-8")
 
 # ─────────────────────────────────────────────
 # ESTILOS CSS: PUERTA DE LA NEVERA RETRO (MISMA TEMÁTICA DEL PROYECTO)
@@ -230,13 +239,13 @@ header {visibility: hidden;}
 div.stButton > button,
 [data-testid="stButton"] > button {
     width: 100%;
-    min-height: 64px;
+    min-height: 62px;
     background: linear-gradient(135deg, #D47157 0%, #B8553D 100%) !important;
     color: #FBF9F5 !important;
     border: 3px solid #F7F4EE !important;
     border-radius: 18px !important;
     font-family: 'Fredoka', cursive, sans-serif !important;
-    font-size: 1.05rem !important;
+    font-size: 1.02rem !important;
     font-weight: 600 !important;
     letter-spacing: 0.8px;
     text-transform: uppercase;
@@ -250,7 +259,7 @@ div.stButton > button p,
 [data-testid="stButton"] > button p,
 div.stButton > button span {
     font-family: 'Fredoka', cursive, sans-serif !important;
-    font-size: 1.05rem !important;
+    font-size: 1.02rem !important;
     font-weight: 600 !important;
     color: #FBF9F5 !important;
     margin: 0 !important;
@@ -270,7 +279,7 @@ div.stButton > button:active,
 }
 
 /* Legibilidad de etiquetas sobre la puerta */
-.stToggle label p, .stTextArea label p, .stFileUploader label p, .stCameraInput label p {
+.stToggle label p, .stTextArea label p, .stTextInput label p, .stFileUploader label p, .stCameraInput label p {
     color: #1B3631 !important;
     font-weight: 800 !important;
 }
@@ -289,6 +298,9 @@ div.stButton > button:active,
 }
 </style>
 """, unsafe_allow_html=True)
+
+if "foto_camara_externa" not in st.session_state:
+    st.session_state.foto_camara_externa = None
 
 # ─────────────────────────────────────────────
 # 1. PLACA SUPERIOR DE LA NEVERA CON ÍCONO SVG E IMANES
@@ -309,6 +321,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+if not OPENAI_DISPONIBLE:
+    st.warning("⚠️ Falta instalar `openai`. Agrégalo a `requirements.txt` en la raíz de tu GitHub junto a `streamlit`, `paho-mqtt` y `requests`.")
+
 # ─────────────────────────────────────────────
 # 2. PANTALLA DIGITAL DE LA NEVERA (VISIÓN IA)
 # ─────────────────────────────────────────────
@@ -321,7 +336,7 @@ st.markdown("""
         📸 Escáner de Comida en tu Nevera
     </h2>
     <p class="led-subtitle">
-        Usa la <b>cámara en vivo</b> o sube una foto del interior de tu nevera para saber qué alimentos tienes, cuáles consumir primero y qué evitar comprar de más.
+        Conecta una <b>cámara externa (ESP32-CAM / IP)</b>, usa la cámara de tu dispositivo o sube una foto para que la IA audite tus alimentos.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -337,12 +352,34 @@ with st.expander("🔑 Configurar Clave OpenAI", expanded=(not bool(api_key))):
         api_key = ke
         os.environ["OPENAI_API_KEY"] = ke
 
-client = OpenAI(api_key=api_key) if api_key else None
+client = OpenAI(api_key=api_key) if (api_key and OPENAI_DISPONIBLE) else None
 
 # ─────────────────────────────────────────────
-# 3. CAPTURA CON CÁMARA EN VIVO O SUBIDA DE FOTO
+# 3. TRES MODOS DE CAPTURA: CÁMARA EXTERNA, CÁMARA LOCAL O FOTO
 # ─────────────────────────────────────────────
-tab_camara, tab_foto = st.tabs(["📸 Usar Cámara en Vivo", "🖼️ Subir Foto"])
+tab_url, tab_camara, tab_foto = st.tabs([
+    "🌐 Cámara Externa (URL)",
+    "📸 Cámara Local",
+    "🖼️ Subir Foto"
+])
+
+with tab_url:
+    url_camara = st.text_input(
+        "URL de captura de la cámara externa (ESP32-CAM / IP o imagen pública):",
+        placeholder="Ej: http://tu-camara-o-ngrok/capture"
+    )
+    if st.button("📷 Capturar desde Cámara Externa", use_container_width=True):
+        if not url_camara.strip():
+            st.warning("⚠️ Ingresa primero la URL de la cámara externa.")
+        else:
+            try:
+                with st.spinner("📡 Descargando imagen desde la cámara externa..."):
+                    resp = requests.get(url_camara.strip(), timeout=8)
+                    resp.raise_for_status()
+                    st.session_state.foto_camara_externa = resp.content
+                    st.success("✅ ¡Captura obtenida desde la cámara externa!")
+            except Exception as e:
+                st.error(f"❌ No se pudo conectar con la cámara externa: {e}")
 
 with tab_camara:
     camera_file = st.camera_input("Apunta la cámara al interior de tu nevera y toma una captura:")
@@ -350,17 +387,23 @@ with tab_camara:
 with tab_foto:
     uploaded_file = st.file_uploader("📥 O selecciona una foto de tu nevera o estante", type=["jpg", "png", "jpeg"])
 
-# Prioridad a la captura de cámara si se usó, si no, a la foto subida
-imagen_para_analizar = camera_file if camera_file is not None else uploaded_file
+# Selección automática de la imagen disponible
+imagen_para_analizar = None
+if camera_file is not None:
+    imagen_para_analizar = camera_file
+elif uploaded_file is not None:
+    imagen_para_analizar = uploaded_file
+elif st.session_state.foto_camara_externa is not None:
+    imagen_para_analizar = st.session_state.foto_camara_externa
 
-if imagen_para_analizar:
+if imagen_para_analizar is not None:
     with st.expander("🖼️ Vista previa de tu nevera", expanded=True):
         st.image(imagen_para_analizar, caption="Imagen lista para analizar", use_container_width=True)
 else:
     st.markdown("""
     <div class="sticky-note">
         <div class="sticky-pin"></div><br>
-        🍓 Abre la pestaña <b>Usar Cámara en Vivo</b> o sube una foto para que la IA revise tus estantes.
+        🍓 Pega la URL de tu <b>cámara externa</b>, usa la cámara local o sube una foto para que la IA revise tus estantes.
     </div>
     """, unsafe_allow_html=True)
 
@@ -447,8 +490,8 @@ if imagen_para_analizar is not None and api_key and analyze_button and client:
             st.error(f"Ocurrió un error al analizar la nevera: {e}")
 
 else:
-    if not imagen_para_analizar and analyze_button:
-        st.warning("⚠️ Por favor toma una captura con la cámara o sube una foto de tu nevera primero.")
+    if imagen_para_analizar is None and analyze_button:
+        st.warning("⚠️ Por favor captura una imagen con la cámara externa/local o sube una foto de tu nevera primero.")
     if not api_key and analyze_button:
         st.warning("🔑 Por favor ingresa tu Clave API de OpenAI en el desplegable superior para activar el análisis.")
 
